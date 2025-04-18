@@ -69,6 +69,7 @@ public class DashboardService {
           } else {
             SoldDish soldDish = new SoldDish();
 
+            soldDish.setSalesPoint(dishOrder.getSalesPoint());
             soldDish.setDishName(dishOrder.getDishName());
             soldDish.setTotalProfit(dishOrder.getTotalAmount().doubleValue());
             soldDish.setTotalQuantities((long) dishOrder.getQuantity());
@@ -77,9 +78,9 @@ public class DashboardService {
           }
         });
 
-    return soldDishes.stream()
+    return new ArrayList<>(soldDishes.stream()
         .sorted(Comparator.comparing(SoldDish::getTotalQuantities, Comparator.naturalOrder()))
-        .toList();
+        .toList());
   }
 
   public ProcessingTime getProcessingTimeFor(
