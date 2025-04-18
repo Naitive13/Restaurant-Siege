@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class DishOrder {
+    private Long dishOrderId;
     private Long dishId;
     private String dishName;
     private int quantity;
