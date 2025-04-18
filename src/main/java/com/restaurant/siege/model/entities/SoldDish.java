@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class SoldDish {
+    private String salesPoint;
     private String dishName;
     private Long totalQuantities;
     private Double totalProfit;
