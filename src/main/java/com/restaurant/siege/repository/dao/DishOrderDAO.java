@@ -23,7 +23,7 @@ public class DishOrderDAO {
   public List<DishOrder> getAll(int page, int pageSize) {
     List<DishOrder> dishes = new ArrayList<>();
     String query =
-        "SELECT dish_order_id, sales_point, dish_name, dish_id"
+        "SELECT dish_order_id, sales_point, dish_name, dish_id, "
             + "quantity_sold, total_amount, actual_status "
             + "FROM dish_order LIMIT ? OFFSET ?";
 
