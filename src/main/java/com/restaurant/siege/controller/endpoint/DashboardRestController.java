@@ -4,9 +4,9 @@ import com.restaurant.siege.model.DurationType;
 import com.restaurant.siege.model.ProcessingTimeType;
 import com.restaurant.siege.model.entities.ProcessingTime;
 import com.restaurant.siege.model.entities.SoldDish;
+import com.restaurant.siege.model.rest.SoldDishRest;
 import com.restaurant.siege.service.DashboardService;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -23,35 +23,43 @@ public class DashboardRestController {
 
   @GetMapping("/bestSales")
   public ResponseEntity<Object> getBestSales(
-      @RequestParam LocalDateTime dateMin,
-      @RequestParam LocalDateTime dateMax,
-      @RequestParam int size) {
+      @RequestParam(required = false) LocalDateTime dateMin,
+      @RequestParam(required = false) LocalDateTime dateMax,
+      @RequestParam int top) {
     try {
       List<SoldDish> soldDishes = dashboardService.getBestSales(dateMin, dateMax);
-      List<SoldDish> body = new ArrayList<>();
-      while (body.size() != size) {
-        body.add(soldDishes.removeFirst());
+      while (true) {
+        if (soldDishes.size() > top) {
+          soldDishes.removeLast();
+        } else {
+          break;
+        }
       }
-      return ResponseEntity.ok().body(body);
+
+      SoldDishRest soldDishRest = new SoldDishRest();
+      soldDishRest.setUpdatedAt(LocalDateTime.now());
+      soldDishRest.setSales(soldDishes);
+      return ResponseEntity.ok().body(soldDishRest);
     } catch (Exception e) {
+      log.info(e.getMessage());
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
     }
   }
 
-  @GetMapping("/dishes/{id}/processingTime")
+  @GetMapping("/dishes/{id}/bestProcessingTime")
   public ResponseEntity<Object> getProcessingTime(
       @PathVariable Long id,
-      @RequestParam(defaultValue = "SECOND", required = false) String durationType,
-      @RequestParam(defaultValue = "AVERAGE", required = false) String processingTimeType) {
+      @RequestParam(defaultValue = "SECOND", required = false) String durationUnit,
+      @RequestParam(defaultValue = "AVERAGE", required = false) String calculationMode) {
 
     try {
-      log.info(durationType);
-      log.info(processingTimeType);
+      log.info(durationUnit);
+      log.info(calculationMode);
       ProcessingTime processingTime =
           dashboardService.getProcessingTimeFor(
               id,
-              ProcessingTimeType.valueOf(processingTimeType),
-              DurationType.valueOf(durationType));
+              ProcessingTimeType.valueOf(calculationMode),
+              DurationType.valueOf(durationUnit));
       return ResponseEntity.ok().body(processingTime);
 
     } catch (Exception e) {
@@ -61,10 +69,10 @@ public class DashboardRestController {
   }
 
   @PostMapping("/syncrhonization")
-  public ResponseEntity<Object> synchronization(){
-    try{
-    dashboardService.sync();
-    return ResponseEntity.ok().build();
+  public ResponseEntity<Object> synchronization() {
+    try {
+      dashboardService.sync();
+      return ResponseEntity.ok().build();
     } catch (Exception e) {
       log.error(e.getMessage());
       return ResponseEntity.internalServerError().body("Failed to sync");
