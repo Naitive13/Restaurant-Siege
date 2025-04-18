@@ -1,6 +1,8 @@
 package com.restaurant.siege.model.entities;
 
 import java.util.List;
+
+import com.restaurant.siege.model.enums.StatusType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -8,10 +10,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class DishOrder {
     private Long dishOrderId;
+    private String salesPoint;
     private Long dishId;
     private String dishName;
     private int quantity;
     private Long totalAmount;
     private List<DishOrderStatus> statusList;
-    private DishOrderStatus actualStatus;
+    private StatusType actualStatus;
 }
