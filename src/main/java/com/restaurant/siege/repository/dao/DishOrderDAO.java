@@ -18,11 +18,12 @@ import java.util.List;
 public class DishOrderDAO {
   private final Datasource datasource;
   private final DishOrderMapper dishOrderMapper;
+  private final DishOrderStatusDAO dishOrderStatusDAO;
 
   public List<DishOrder> getAll(int page, int pageSize) {
     List<DishOrder> dishes = new ArrayList<>();
     String query =
-        "SELECT dish_order_id, sales_point, dish_name,"
+        "SELECT dish_order_id, sales_point, dish_name, dish_id"
             + "quantity_sold, total_amount, actual_status "
             + "FROM dish_order LIMIT ? OFFSET ?";
 
@@ -47,10 +48,10 @@ public class DishOrderDAO {
     List<DishOrder> dishes = new ArrayList<>();
     String query =
         "INSERT INTO dish_order "
-            + "(dish_order_id, sales_point, dish_name, quantity_sold,total_amount,actual_status) "
-            + "VALUES (?,?,?,?,?,?::statusType) "
+            + "(dish_order_id, sales_point, dish_name, quantity_sold,total_amount,actual_status, dish_id) "
+            + "VALUES (?,?,?,?,?,?::statusType,?) "
             + "ON CONFLICT (dish_order_id) DO NOTHING "
-            + "RETURNING dish_order_id, sales_point, dish_name, quantity_sold,total_amount,actual_status";
+            + "RETURNING dish_order_id, sales_point, dish_name, quantity_sold,total_amount,actual_status, dish_id";
 
     try (Connection connection = this.datasource.getConnection();
         PreparedStatement st = connection.prepareStatement(query)) {
@@ -64,8 +65,10 @@ public class DishOrderDAO {
               st.setLong(4,dish.getQuantity());
               st.setLong(5, dish.getTotalAmount());
               st.setString(6,dish.getActualStatus().toString());
+              st.setLong(7,dish.getDishId());
 
               try (ResultSet rs = st.executeQuery()) {
+                dishOrderStatusDAO.saveAll(dish.getStatusList());
                 if (rs.next()) {
                   dishes.add(dishOrderMapper.apply(rs));
                 }
