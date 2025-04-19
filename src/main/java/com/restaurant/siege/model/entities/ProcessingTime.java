@@ -5,6 +5,8 @@ import com.restaurant.siege.model.DurationType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
+
 @Data
 @NoArgsConstructor
 public class ProcessingTime {
@@ -14,4 +16,6 @@ public class ProcessingTime {
     private DurationType durationUnit;
     @JsonIgnore
     private DishOrder dishOrder;
+    @JsonIgnore
+    private Duration rawDuration;
 }
