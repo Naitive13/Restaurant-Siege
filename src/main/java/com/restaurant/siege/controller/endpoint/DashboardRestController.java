@@ -4,6 +4,7 @@ import com.restaurant.siege.model.DurationType;
 import com.restaurant.siege.model.ProcessingTimeType;
 import com.restaurant.siege.model.entities.ProcessingTime;
 import com.restaurant.siege.model.entities.SoldDish;
+import com.restaurant.siege.model.rest.ProcessingTimeRest;
 import com.restaurant.siege.model.rest.SoldDishRest;
 import com.restaurant.siege.service.DashboardService;
 import java.time.LocalDateTime;
@@ -50,18 +51,24 @@ public class DashboardRestController {
   public ResponseEntity<Object> getProcessingTime(
       @PathVariable Long id,
       @RequestParam(defaultValue = "SECOND", required = false) String durationUnit,
-      @RequestParam(defaultValue = "AVERAGE", required = false) String calculationMode) {
+      @RequestParam(defaultValue = "AVERAGE", required = false) String calculationMode,
+      @RequestParam int top) {
 
     try {
-      log.info(durationUnit);
-      log.info(calculationMode);
-      ProcessingTime processingTime =
-          dashboardService.getProcessingTimeFor(
-              id,
-              ProcessingTimeType.valueOf(calculationMode),
-              DurationType.valueOf(durationUnit));
-      return ResponseEntity.ok().body(processingTime);
+      List<ProcessingTime> processingTimes = dashboardService.getProcessingTimeFor(id,ProcessingTimeType.valueOf(calculationMode),DurationType.valueOf(durationUnit));
+      while (true) {
+        if (processingTimes.size() > top) {
+          processingTimes.removeLast();
+        } else {
+          break;
+        }
+      }
 
+      ProcessingTimeRest processingTimeRest = new ProcessingTimeRest();
+      processingTimeRest.setUpdatedAt(LocalDateTime.now());
+      processingTimeRest.setBestProcessingTimes(processingTimes);
+
+      return ResponseEntity.ok().body(processingTimeRest);
     } catch (Exception e) {
       log.error(e.getMessage());
       return new ResponseEntity<>(HttpStatus.BAD_REQUEST);

@@ -1,7 +1,7 @@
 package com.restaurant.siege.service;
 
 import static com.restaurant.siege.model.enums.StatusType.DONE;
-import static com.restaurant.siege.model.enums.StatusType.IN_PROGRESS;
+import static java.util.Comparator.naturalOrder;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,18 +12,17 @@ import com.restaurant.siege.model.entities.DishOrder;
 import com.restaurant.siege.model.entities.DishOrderStatus;
 import com.restaurant.siege.model.entities.ProcessingTime;
 import com.restaurant.siege.model.entities.SoldDish;
+import com.restaurant.siege.repository.dao.DishOrderDAO;
+import com.restaurant.siege.service.mapper.ProcessingTimeMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-
-import com.restaurant.siege.repository.dao.DishOrderDAO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +32,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DashboardService {
   private final DishOrderDAO dishOrderDAO;
+  private final ProcessingTimeMapper processingTimeMapper;
 
   public List<SoldDish> getBestSales(LocalDateTime dateMin, LocalDateTime dateMax) {
     List<DishOrder> dishOrders = dishOrderDAO.getAll(1, 100);
@@ -45,12 +45,13 @@ public class DashboardService {
             .toList();
     List<DishOrder> dishOrdersBetweenInterval =
         finished.stream()
-            .filter(dishOrder -> {
-              if (dateMax != null && dateMin != null){
-                return filterDishOrder(dateMin, dateMax, dishOrder);
-              }
-              return true;
-            })
+            .filter(
+                dishOrder -> {
+                  if (dateMax != null && dateMin != null) {
+                    return filterDishOrder(dateMin, dateMax, dishOrder);
+                  }
+                  return true;
+                })
             .toList();
 
     List<SoldDish> soldDishes = new ArrayList<>();
@@ -78,75 +79,55 @@ public class DashboardService {
           }
         });
 
-    return new ArrayList<>(soldDishes.stream()
-        .sorted(Comparator.comparing(SoldDish::getTotalQuantities, Comparator.naturalOrder()))
-        .toList());
+    return new ArrayList<>(
+        soldDishes.stream()
+            .sorted(Comparator.comparing(SoldDish::getTotalQuantities, naturalOrder()))
+            .toList());
   }
 
-  public ProcessingTime getProcessingTimeFor(
+  public List<ProcessingTime> getProcessingTimeFor(
       Long dishId, ProcessingTimeType processingTimeType, DurationType durationType) {
-    //    List<DishOrder> dishOrders = dishOrderDAO.getByDishId(dishId);
-    try (HttpClient client = HttpClient.newHttpClient()) {
-      HttpRequest request =
-          HttpRequest.newBuilder()
-              .uri(new URI("http://localhost:8081/dishOrders?page=1&pageSize=10"))
-              .build();
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-      ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-      log.info(response.body());
+    List<DishOrder> dishOrders = dishOrderDAO.getByDishId(dishId);
+    List<ProcessingTime> processingTimes = new ArrayList<>(dishOrders.stream().map(processingTimeMapper).toList());
 
-      List<DishOrder> dishOrders =
-          objectMapper.readValue(response.body(), new TypeReference<List<DishOrder>>() {});
-
-      List<Duration> durations =
-          dishOrders.stream()
-              .map(
-                  dishOrder -> {
-                    LocalDateTime inProgressDate =
-                        dishOrder.getStatusList().stream()
-                            .filter(
-                                dishOrderStatus -> dishOrderStatus.getStatus().equals(IN_PROGRESS))
-                            .toList()
-                            .getFirst()
-                            .getCreationDate();
-                    LocalDateTime doneDate =
-                        dishOrder.getStatusList().stream()
-                            .filter(dishOrderStatus -> dishOrderStatus.getStatus().equals(DONE))
-                            .toList()
-                            .getFirst()
-                            .getCreationDate();
-                    return Duration.between(inProgressDate, doneDate);
-                  })
-              .toList();
-
-      ProcessingTime result = new ProcessingTime();
-      Duration duration = null;
-      result.setProcessingTimeType(processingTimeType);
-      result.setDurationType(durationType);
-      switch (processingTimeType) {
-        case MINIMUM -> {
-          duration = durations.stream().min(Duration::compareTo).get();
-        }
-
-        case MAXIMUM -> {
-          duration = durations.stream().max(Duration::compareTo).get();
-        }
-
-        case AVERAGE -> {
-          duration = durations.stream().reduce((Duration::plus)).get().dividedBy(durations.size());
-        }
+    switch (processingTimeType) {
+      case MINIMUM -> {
+        processingTimes.sort(Comparator.comparing(ProcessingTime::getRawDuration,naturalOrder()));
       }
 
-      switch (durationType) {
-        case SECOND -> result.setValue(duration.toSeconds());
-        case MINUTE -> result.setValue(duration.toMinutes());
-        case HOUR -> result.setValue(duration.toHours());
+      case MAXIMUM -> {
+        processingTimes.sort(Comparator.comparing(ProcessingTime::getRawDuration,naturalOrder()).reversed());
       }
 
-      return result;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+      case AVERAGE -> {
+        processingTimes.forEach(processingTime -> {
+          processingTime.setRawDuration(processingTime.getRawDuration().dividedBy(processingTime.getDishOrder().getQuantity()));
+        });
+        processingTimes.sort(Comparator.comparing(ProcessingTime::getRawDuration,naturalOrder()));
+      }
     }
+
+    switch (durationType) {
+      case SECOND -> {
+        processingTimes.forEach(processingTime -> {
+          processingTime.setDurationUnit(durationType);
+          processingTime.setPreparationDuration(processingTime.getRawDuration().toSeconds());
+        });
+      }
+      case MINUTE -> {
+        processingTimes.forEach(processingTime -> {
+          processingTime.setDurationUnit(durationType);
+          processingTime.setPreparationDuration(processingTime.getRawDuration().toMinutes());
+        });
+      }
+      case HOUR -> {
+        processingTimes.forEach(processingTime -> {
+          processingTime.setDurationUnit(durationType);
+          processingTime.setPreparationDuration(processingTime.getRawDuration().toHours());
+        });
+      }
+    }
+    return processingTimes;
   }
 
   public void sync() {
