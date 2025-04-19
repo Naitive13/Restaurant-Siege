@@ -83,4 +83,27 @@ public class DishOrderDAO {
       throw new RuntimeException(e);
     }
   }
+
+    public List<DishOrder> getByDishId(Long dishId) {
+      List<DishOrder> dishes = new ArrayList<>();
+      String query =
+              "SELECT dish_order_id, sales_point, dish_name, dish_id, "
+                      + "quantity_sold, total_amount, actual_status "
+                      + "FROM dish_order WHERE dish_id = ?";
+
+      try (Connection connection = this.datasource.getConnection();
+           PreparedStatement st = connection.prepareStatement(query)) {
+        st.setLong(1, dishId);
+
+        try (ResultSet rs = st.executeQuery()) {
+          while (rs.next()) {
+            DishOrder dishOrder = dishOrderMapper.apply(rs);
+            dishes.add(dishOrder);
+          }
+        }
+        return dishes;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
 }
